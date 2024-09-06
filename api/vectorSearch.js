@@ -1,7 +1,8 @@
-// vectorSearch.js
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { MongoDBAtlasVectorSearch } from "langchain/vectorstores/mongodb_atlas";
-import mongoClientPromise from './mongodb';
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
+import mongoClientPromise from '../lib/mongodb';
+// Remove punycode if it's not needed
+// const punycode = require('punycode');
 
 export default async function handler(req, res) {
   try {
@@ -10,7 +11,8 @@ export default async function handler(req, res) {
     const collectionName = "embeddings";
     const collection = client.db(dbName).collection(collectionName);
 
-    const question = await req.text();
+    // Access request body directly
+    const question = req.body; // Assuming body contains the question as text
 
     const vectorStore = new MongoDBAtlasVectorSearch(
       new OpenAIEmbeddings({
@@ -19,7 +21,7 @@ export default async function handler(req, res) {
       }), {
       collection,
       indexName: "default",
-      textKey: "text", 
+      textKey: "text",
       embeddingKey: "embedding",
     });
 
@@ -31,7 +33,7 @@ export default async function handler(req, res) {
       },
     });
 
-    const retrieverOutput = await retriever.getRelevantDocuments(question);
+    const retrieverOutput = await retriever.invoke(question);
 
     res.status(200).json(retrieverOutput);
   } catch (error) {
