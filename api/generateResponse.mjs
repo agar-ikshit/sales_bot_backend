@@ -1,6 +1,25 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
 import fetch from 'node-fetch'; // Assuming you have node-fetch installed
+import { MongoClient } from 'mongodb';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+// MongoDB connection setup
+const uri = process.env.MONGODB_URI; // Use MONGODB_URI from environment variables
+const client = new MongoClient(uri);
+
+async function connectToDatabase() {
+  if (!client.isConnected()) {
+    await client.connect();
+  }
+  return client.db('chat_history');
+}
+
+// In-memory store for current session chat history
+const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
   try {
@@ -12,6 +31,22 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const currentMessageContent = inputdata.message;
+    const sessionId = req.sessionID || inputdata.sessionId; // Get session ID or any identifier for the conversation
+
+    // Retrieve current session history from in-memory store
+    let allSessionChatHistory = sessionChatHistory.get(sessionId) || [];
+    let currentChatHistory = allSessionChatHistory.slice(-4); // Last 4 messages
+
+    // Add current message to all session chat history
+    allSessionChatHistory.push(new HumanMessage({ content: currentMessageContent }));
+
+    // Update in-memory store with the full chat history
+    sessionChatHistory.set(sessionId, allSessionChatHistory);
+
+    // Format the last 4 messages into a string
+    const formattedChatHistory = currentChatHistory
+      .map((message) => `User: ${message.content}`)
+      .join('\n');
 
     // Call the vector search handler to get the relevant context
     const vectorSearchResponse = await fetch('https://backend-theta-eosin.vercel.app/api/vectorSearch', {
@@ -27,10 +62,9 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const vectorSearchResult = await vectorSearchResponse.json();
-    console.log("Vector Search Result:", vectorSearchResult);
     const context = vectorSearchResult.text || '';
-    console.log("Context Extracted:", context);
 
+    // Combine the chat history and context in the prompt
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     You also need to ask for the customer's name and contact number and then store them.
@@ -38,18 +72,28 @@ export default async function generateResponseHandler(req, res) {
     ------------
     ${context}
     ------------
-    REMEMBER: If there is no relevant information within the context, just say "Hmm, I'm not sure but we will get back to you shortly with your answer". Don't try to make up an answer. Never break character.
-    ${currentMessageContent}
+    Chat History:
+    ${formattedChatHistory}
+    ------------
+    Current Message: ${currentMessageContent}
     `;
 
-    // console.log("TEMPLATE:", TEMPLATE);
+    const llm = new ChatOpenAI({
+      modelName: "gpt-3.5-turbo",
+      streaming: false,
+    });
 
-    // const llm = new ChatOpenAI({
-    //   modelName: "gpt-3.5-turbo",
-    //   streaming: false,
-    // });
+    // Retrieve response from the LLM
+    const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
 
-    // const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
+    // Save all session chat history to MongoDB
+    const db = await connectToDatabase();
+    const chatHistoryCollection = db.collection('messages');
+    await chatHistoryCollection.updateOne(
+      { sessionId },
+      { $set: { history: allSessionChatHistory } },
+      { upsert: true }
+    );
 
     res.status(200).json({ text: result });
   } catch (error) {
@@ -57,4 +101,3 @@ export default async function generateResponseHandler(req, res) {
     res.status(500).json({ error: 'Error generating response' });
   }
 }
-
