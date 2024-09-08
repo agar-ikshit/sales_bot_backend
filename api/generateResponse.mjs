@@ -1,4 +1,3 @@
-// File: api/generateResponseHandler.js
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
 import fetch from 'node-fetch'; // Assuming you have node-fetch installed
@@ -28,9 +27,10 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const vectorSearchResult = await vectorSearchResponse.json();
-    const context = vectorSearchResult.text || ''; // Adjust based on actual response structure
+    console.log("Vector Search Result:", vectorSearchResult);
+    const context = vectorSearchResult.text || '';
+    console.log("Context Extracted:", context);
 
-    // Define the template for the conversation using vector search results
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     You also need to ask for the customer's name and contact number and then store them.
@@ -42,13 +42,14 @@ export default async function generateResponseHandler(req, res) {
     ${currentMessageContent}
     `;
 
+    console.log("TEMPLATE:", TEMPLATE);
+
     const llm = new ChatOpenAI({
       modelName: "gpt-3.5-turbo",
       streaming: false,
     });
 
-    // Ensure to use the correct format for the messages
-    const result = await llm.call(new HumanMessage({ content: TEMPLATE }));
+    const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
 
     res.status(200).json({ text: result });
   } catch (error) {
@@ -56,3 +57,4 @@ export default async function generateResponseHandler(req, res) {
     res.status(500).json({ error: 'Error generating response' });
   }
 }
+

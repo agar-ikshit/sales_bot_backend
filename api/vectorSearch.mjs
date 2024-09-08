@@ -3,12 +3,38 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import mongoClientPromise from '../lib/mongodb.mjs';
 
+let vectorStore;
+
+async function createVectorStore() {
+  try {
+    const client = await mongoClientPromise;
+    const dbName = "docs";
+    const collectionName = "embeddings";
+    const collection = client.db(dbName).collection(collectionName);
+
+    vectorStore = new MongoDBAtlasVectorSearch(
+      new OpenAIEmbeddings({
+        modelName: 'text-embedding-ada-002',
+        stripNewLines: true,
+      }), {
+      collection,
+      indexName: "vector_index", // Ensure this matches your index name
+      textKey: "text", // Field where the text is stored
+      embeddingKey: "embedding", // Field where the vector embeddings are stored
+      similarity: "cosine" // Ensure this matches your index configuration
+    });
+
+    console.log("Vector Store created successfully");
+  } catch (error) {
+    console.error('Error creating Vector Store:', error);
+    throw new Error('Failed to create vector store');
+  }
+}
+
 export default async function vectorSearchHandler(req, res) {
   try {
-    // Log the entire request body for debugging
     console.log("Request Body:", req.body);
 
-    // Check if req.body is properly parsed and contains the message
     const question = req.body.message;
     if (typeof question !== 'string' || question.trim() === '') {
       return res.status(400).json({ error: 'Invalid or missing question' });
@@ -16,26 +42,12 @@ export default async function vectorSearchHandler(req, res) {
 
     console.log("Question:", question);
 
-    const client = await mongoClientPromise;
-    const dbName = "docs";
-    const collectionName = "embeddings";
-    const collection = client.db(dbName).collection(collectionName);
-
-    const vectorStore = new MongoDBAtlasVectorSearch(
-      new OpenAIEmbeddings({
-        modelName: 'text-embedding-ada-002',
-        stripNewLines: true,
-      }), {
-      collection,
-      indexName: "default",
-      textKey: "text",
-      embeddingKey: "embedding",
-    });
-
-    console.log("VectorStore created");
+    if (!vectorStore) {
+      await createVectorStore();
+    }
 
     const retriever = vectorStore.asRetriever({
-      searchType: "mmr",
+      searchType: "mmr", // Ensure this matches your search type
       searchKwargs: {
         fetchK: 20,
         lambda: 0.1,
@@ -47,6 +59,10 @@ export default async function vectorSearchHandler(req, res) {
     const retrieverOutput = await retriever.invoke(question);
 
     console.log("Retriever Output:", retrieverOutput);
+
+    if (retrieverOutput.length === 0) {
+      console.log("No results found for query:", question);
+    }
 
     res.status(200).json(retrieverOutput);
   } catch (error) {
