@@ -1,19 +1,16 @@
-import { ChatOpenAI } from 'langchain/chat_models/openai';
-import { AIMessage, HumanMessage } from 'langchain/schema';
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage } from '@langchain/core/messages';
 
-export default async function handler(req, res) {
+export default async function generateResponseHandler(req, res) {
   try {
-    // Parse the request body to get the message content
-    const currentMessageContent = await req.text(); 
+    // Ensure input data is correctly parsed
+    const inputdata = req.body;
 
-    // Optionally perform vector search if needed
-    const vectorSearch = await fetch("https://your-vercel-url/api/vectorSearch", {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain",
-      },
-      body: currentMessageContent,
-    }).then(res => res.json());
+    if (!inputdata || typeof inputdata.message !== 'string') {
+      return res.status(400).json({ error: 'Invalid input data' });
+    }
+
+    const currentMessageContent = inputdata.message;
 
     // Define the template for the conversation
     const TEMPLATE = `
@@ -26,19 +23,17 @@ export default async function handler(req, res) {
     REMEMBER: If there is no relevant information within the context, just say "Hmm, I'm not sure but we will get back to you shortly with your answer". Don't try to make up an answer. Never break character.
     `;
 
-    // Initialize the ChatOpenAI model
     const llm = new ChatOpenAI({
       modelName: "gpt-3.5-turbo",
       streaming: false,
     });
 
-    // Call the model with the message content
-    const result = await llm.call(new HumanMessage(TEMPLATE));
+    // Ensure to use the correct format for the messages
+    const result = await llm.call(new HumanMessage({ content: TEMPLATE }));
 
-    // Respond with the generated text
     res.status(200).json({ text: result });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error generating response" });
+    console.error('Error generating response:', error);
+    res.status(500).json({ error: 'Error generating response' });
   }
 }
