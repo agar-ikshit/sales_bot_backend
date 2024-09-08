@@ -1,3 +1,4 @@
+// File: api/vectorSearchHandler.js
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import mongoClientPromise from '../lib/mongodb.mjs';

@@ -1,5 +1,7 @@
+// File: api/generateResponseHandler.js
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
+import fetch from 'node-fetch'; // Assuming you have node-fetch installed
 
 export default async function generateResponseHandler(req, res) {
   try {
@@ -12,15 +14,32 @@ export default async function generateResponseHandler(req, res) {
 
     const currentMessageContent = inputdata.message;
 
-    // Define the template for the conversation
+    // Call the vector search handler to get the relevant context
+    const vectorSearchResponse = await fetch('https://backend-theta-eosin.vercel.app/api/vectorSearch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: currentMessageContent }),
+    });
+
+    if (!vectorSearchResponse.ok) {
+      throw new Error('Vector search failed');
+    }
+
+    const vectorSearchResult = await vectorSearchResponse.json();
+    const context = vectorSearchResult.text || ''; // Adjust based on actual response structure
+
+    // Define the template for the conversation using vector search results
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     You also need to ask for the customer's name and contact number and then store them.
     If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
-    ${currentMessageContent}
+    ${context}
     ------------
     REMEMBER: If there is no relevant information within the context, just say "Hmm, I'm not sure but we will get back to you shortly with your answer". Don't try to make up an answer. Never break character.
+    ${currentMessageContent}
     `;
 
     const llm = new ChatOpenAI({
