@@ -1,22 +1,12 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
 import fetch from 'node-fetch'; // Assuming you have node-fetch installed
-import { MongoClient } from 'mongodb';
+import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env file
-dotenv.config();
 
-// MongoDB connection setup
-const uri = process.env.MONGODB_URI; // Use MONGODB_URI from environment variables
-const client = new MongoClient(uri);
 
-async function connectToDatabase() {
-  if (!client.isConnected()) {
-    await client.connect();
-  }
-  return client.db('chat_history');
-}
+
 
 // In-memory store for current session chat history
 const sessionChatHistory = new Map();
@@ -87,9 +77,11 @@ export default async function generateResponseHandler(req, res) {
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
 
     // Save all session chat history to MongoDB
-    const db = await connectToDatabase();
-    const chatHistoryCollection = db.collection('messages');
-    await chatHistoryCollection.updateOne(
+    const client = await mongoClientPromise;
+const dbName = "chat_history";
+const collectionName = "messages";
+const collection = client.db(dbName).collection(collectionName);
+    await collection.updateOne(
       { sessionId },
       { $set: { history: allSessionChatHistory } },
       { upsert: true }
