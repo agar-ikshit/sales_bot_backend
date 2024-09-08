@@ -42,14 +42,14 @@ export default async function generateResponseHandler(req, res) {
     ${currentMessageContent}
     `;
 
-    console.log("TEMPLATE:", TEMPLATE);
+    // console.log("TEMPLATE:", TEMPLATE);
 
-    const llm = new ChatOpenAI({
-      modelName: "gpt-3.5-turbo",
-      streaming: false,
-    });
+    // const llm = new ChatOpenAI({
+    //   modelName: "gpt-3.5-turbo",
+    //   streaming: false,
+    // });
 
-    const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
+    // const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
 
     res.status(200).json({ text: result });
   } catch (error) {
