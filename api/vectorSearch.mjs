@@ -4,17 +4,21 @@ import mongoClientPromise from '../lib/mongodb.mjs';
 
 export default async function vectorSearchHandler(req, res) {
   try {
-    const client = await mongoClientPromise;
-    const dbName = "docs";
-    const collectionName = "embeddings";
-    const collection = client.db(dbName).collection(collectionName);
+    // Log the entire request body for debugging
+    console.log("Request Body:", req.body);
 
+    // Check if req.body is properly parsed and contains the message
     const question = req.body.message;
     if (typeof question !== 'string' || question.trim() === '') {
       return res.status(400).json({ error: 'Invalid or missing question' });
     }
 
     console.log("Question:", question);
+
+    const client = await mongoClientPromise;
+    const dbName = "docs";
+    const collectionName = "embeddings";
+    const collection = client.db(dbName).collection(collectionName);
 
     const vectorStore = new MongoDBAtlasVectorSearch(
       new OpenAIEmbeddings({

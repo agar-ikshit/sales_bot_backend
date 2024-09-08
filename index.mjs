@@ -9,7 +9,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', healthCheckHandler);
+app.get('/api/health', healthCheckHandler);
 
 // Vector search endpoint
 app.post('/api/vectorSearch', vectorSearchHandler);
