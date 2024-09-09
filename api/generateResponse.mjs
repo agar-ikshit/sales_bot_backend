@@ -4,14 +4,22 @@ import fetch from 'node-fetch'; // Assuming you have node-fetch installed
 import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
 
-
-
-
-
+dotenv.config(); // Ensure environment variables are loaded
 
 const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app'); // Replace with your frontend origin
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle OPTIONS method (preflight request)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   try {
     // Ensure input data is correctly parsed
     const inputdata = req.body;
@@ -21,24 +29,18 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const currentMessageContent = inputdata.message;
-    const sessionId = req.sessionID || inputdata.sessionId; // Get session ID or any identifier for the conversation
+    const sessionId = req.sessionID || inputdata.sessionId;
 
-    // Retrieve current session history from in-memory store
     let allSessionChatHistory = sessionChatHistory.get(sessionId) || [];
-    let currentChatHistory = allSessionChatHistory.slice(-4); // Last 4 messages
+    let currentChatHistory = allSessionChatHistory.slice(-4);
 
-    // Add current message to all session chat history
     allSessionChatHistory.push(new HumanMessage({ content: currentMessageContent }));
-
-    // Update in-memory store with the full chat history
     sessionChatHistory.set(sessionId, allSessionChatHistory);
 
-    // Format the last 4 messages into a string
     const formattedChatHistory = currentChatHistory
       .map((message) => `User: ${message.content}`)
       .join('\n');
 
-    // Call the vector search handler to get the relevant context
     const vectorSearchResponse = await fetch('https://backend-theta-eosin.vercel.app/api/vectorSearch', {
       method: 'POST',
       headers: {
@@ -54,7 +56,6 @@ export default async function generateResponseHandler(req, res) {
     const vectorSearchResult = await vectorSearchResponse.json();
     const context = vectorSearchResult.text || '';
 
-    // Combine the chat history and context in the prompt
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your are "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     You also need to ask for the customer's name and contact number and then store them.
@@ -73,12 +74,14 @@ export default async function generateResponseHandler(req, res) {
       streaming: false,
     });
 
-    // Retrieve response from the LLM
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
+
+    console.log('Formatted Chat History:', formattedChatHistory);
+    console.log('Context from Vector Search:', context);
+    console.log('LLM Response:', result.kwargs.content);
 
     allSessionChatHistory.push(result.kwargs.content);
 
-    // Save all session chat history to MongoDB
     const client = await mongoClientPromise;
     const dbName = "chat_history";
     const collectionName = "messages";
@@ -89,7 +92,7 @@ export default async function generateResponseHandler(req, res) {
       { upsert: true }
     );
 
-    res.status(200).json({ text: result });
+    res.status(200).json({ text: result.kwargs.content });
   } catch (error) {
     console.error('Error generating response:', error);
     res.status(500).json({ error: 'Error generating response' });
