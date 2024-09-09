@@ -8,6 +8,16 @@ import dotenv from 'dotenv';
 const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
+
+  res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', true);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   try {
     const inputdata = req.body;
 

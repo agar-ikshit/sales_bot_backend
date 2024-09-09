@@ -9,10 +9,8 @@ const router = express.Router();
 // Health check endpoint
 router.get('/api/health', healthCheckHandler);
 
-// Vector search endpoint
 router.post('/api/vectorSearch', vectorSearchHandler);
 
-// Generate response endpoint
 router.post('/api/generateResponse', generateResponseHandler);
 
 export default router;
