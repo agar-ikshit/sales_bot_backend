@@ -9,7 +9,6 @@ const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
   try {
-    // Ensure input data is correctly parsed
     const inputdata = req.body;
 
     if (!inputdata || typeof inputdata.message !== 'string') {
