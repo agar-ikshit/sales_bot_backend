@@ -70,6 +70,7 @@ export default async function generateResponseHandler(req, res) {
 
     // Retrieve response from the LLM
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
+    console.log('LLM result:', result);
 
     allSessionChatHistory.push(result.kwargs.content);
 
