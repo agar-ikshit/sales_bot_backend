@@ -1,9 +1,10 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
-import fetch from 'node-fetch'; // Assuming you have node-fetch installed
+import fetch from 'node-fetch'; // Ensure node-fetch is installed
 import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
 
+dotenv.config(); // Ensure environment variables are loaded
 
 const sessionChatHistory = new Map();
 
@@ -82,7 +83,11 @@ export default async function generateResponseHandler(req, res) {
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
     console.log('LLM result:', result);
 
-    allSessionChatHistory.push(result.kwargs.content);
+    // Ensure the LLM result has a valid 'content' field
+    const responseContent = result?.content || 'No content returned from LLM';
+    
+    // Add the response to the chat history
+    allSessionChatHistory.push(new HumanMessage({ content: responseContent }));
 
     // Save all session chat history to MongoDB
     const client = await mongoClientPromise;
@@ -95,7 +100,7 @@ export default async function generateResponseHandler(req, res) {
       { upsert: true }
     );
 
-    res.status(200).json({ text: result });
+    res.status(200).json({ text: responseContent });
   } catch (error) {
     console.error('Error generating response:', error);
     res.status(500).json({ error: 'Error generating response' });
