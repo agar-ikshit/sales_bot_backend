@@ -1,8 +1,18 @@
 import express from 'express';
-import router from './api/routes.js'; // Import the routes from the routes.js file
+import router from './api/routes.js';
+
+import cors from 'cors';
 
 const app = express();
+
 const port = process.env.PORT || 3000;
+
+
+app.use(cors({
+  origin: 'https://sales-bot-eight.vercel.app', // Replace with your frontend origin
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+}));
 
 app.use(express.json());
 
