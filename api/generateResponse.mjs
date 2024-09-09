@@ -5,10 +5,6 @@ import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
 
 
-
-
-
-
 const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
