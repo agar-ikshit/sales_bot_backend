@@ -1,15 +1,4 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage } from '@langchain/core/messages';
-import fetch from 'node-fetch'; // Ensure node-fetch is installed
-import mongoClientPromise from '../lib/mongodb.mjs';
-import dotenv from 'dotenv';
-
-dotenv.config(); // Ensure environment variables are loaded
-
-const sessionChatHistory = new Map();
-
 export default async function generateResponseHandler(req, res) {
-
   res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -94,11 +83,12 @@ export default async function generateResponseHandler(req, res) {
     const dbName = "chat_history";
     const collectionName = "messages";
     const collection = client.db(dbName).collection(collectionName);
-    await collection.updateOne(
-      { sessionId },
-      { $set: { history: allSessionChatHistory } },
-      { upsert: true }
-    );
+    
+    // Insert a new document instead of updating
+    await collection.insertOne({
+      sessionId,
+      history: allSessionChatHistory
+    });
 
     res.status(200).json({ text: responseContent });
   } catch (error) {
