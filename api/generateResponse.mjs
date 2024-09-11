@@ -1,3 +1,14 @@
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage } from '@langchain/core/messages';
+import fetch from 'node-fetch'; // Ensure node-fetch is installed
+import mongoClientPromise from '../lib/mongodb.mjs';
+import dotenv from 'dotenv';
+
+dotenv.config(); // Ensure environment variables are loaded
+
+// Define session chat history map
+const sessionChatHistory = new Map();
+
 export default async function generateResponseHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -7,7 +18,7 @@ export default async function generateResponseHandler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   try {
     const inputdata = req.body;
 
