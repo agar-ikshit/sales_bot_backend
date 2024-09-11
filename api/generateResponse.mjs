@@ -3,11 +3,9 @@ import { HumanMessage } from '@langchain/core/messages';
 import fetch from 'node-fetch'; // Ensure node-fetch is installed
 import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
+import { parse, serialize } from 'cookie'; // Import cookie functions
 
 dotenv.config(); // Ensure environment variables are loaded
-
-// Define session chat history map
-const sessionChatHistory = new Map();
 
 export default async function generateResponseHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
@@ -26,20 +24,30 @@ export default async function generateResponseHandler(req, res) {
       return res.status(400).json({ error: 'Invalid input data' });
     }
 
-    const currentMessageContent = inputdata.message;
-    const sessionId = req.sessionID || inputdata.sessionId; // Get session ID or any identifier for the conversation
+    // Retrieve session ID from cookies
+    const cookies = parse(req.headers.cookie || '');
+    let sessionId = cookies.sessionId;
 
-    // Retrieve current session history from in-memory store
-    let allSessionChatHistory = sessionChatHistory.get(sessionId) || [];
-    let currentChatHistory = allSessionChatHistory.slice(-4); // Last 4 messages
+    if (!sessionId) {
+      // Generate a new session ID if none exists
+      sessionId = generateUniqueSessionId();
+      res.setHeader('Set-Cookie', serialize('sessionId', sessionId, { httpOnly: true, maxAge: 30 * 60 * 1000 })); // Set cookie
+    }
+
+    const currentMessageContent = inputdata.message;
+
+    // Use sessionId to manage session data
+    const client = await mongoClientPromise;
+    const dbName = "chat_history";
+    const collectionName = "messages";
+    const collection = client.db(dbName).collection(collectionName);
+
+    let allSessionChatHistory = await collection.findOne({ sessionId }) || { history: [] };
+    let currentChatHistory = allSessionChatHistory.history.slice(-4); // Last 4 messages
 
     // Add current message to all session chat history
-    allSessionChatHistory.push(new HumanMessage({ content: currentMessageContent }));
+    allSessionChatHistory.history.push(new HumanMessage({ content: currentMessageContent }));
 
-    // Update in-memory store with the full chat history
-    sessionChatHistory.set(sessionId, allSessionChatHistory);
-
-    // Format the last 4 messages into a string
     const formattedChatHistory = currentChatHistory
       .map((message) => `User: ${message.content}`)
       .join('\n');
@@ -87,23 +95,23 @@ export default async function generateResponseHandler(req, res) {
     const responseContent = result?.content || 'No content returned from LLM';
     
     // Add the response to the chat history
-    allSessionChatHistory.push(new HumanMessage({ content: responseContent }));
+    allSessionChatHistory.history.push(new HumanMessage({ content: responseContent }));
 
     // Save all session chat history to MongoDB
-    const client = await mongoClientPromise;
-    const dbName = "chat_history";
-    const collectionName = "messages";
-    const collection = client.db(dbName).collection(collectionName);
-    
-    // Insert a new document instead of updating
-    await collection.insertOne({
-      sessionId,
-      history: allSessionChatHistory
-    });
+    await collection.updateOne(
+      { sessionId },
+      { $set: { history: allSessionChatHistory.history } },
+      { upsert: true }
+    );
 
     res.status(200).json({ text: responseContent });
   } catch (error) {
     console.error('Error generating response:', error);
     res.status(500).json({ error: 'Error generating response' });
   }
+}
+
+// Utility function to generate a unique session ID
+function generateUniqueSessionId() {
+  return (Math.random() * 1e18).toString(36);
 }
