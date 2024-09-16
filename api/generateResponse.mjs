@@ -17,9 +17,7 @@ const CORS_HEADERS = {
 const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: 'Strict', maxAge: 30 * 60 * 1000, path: '/' };
 
 export default async function generateResponseHandler(req, res) {
-  for (const [key, value] of Object.entries(CORS_HEADERS)) {
-    res.setHeader(key, value);
-  }
+  res.set(CORS_HEADERS);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -114,6 +112,7 @@ export default async function generateResponseHandler(req, res) {
   }
 }
 
+// Utility function to generate a unique session ID
 function generateUniqueSessionId() {
   return (Math.random() * 1e18).toString(36);
 }
