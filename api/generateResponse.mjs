@@ -1,12 +1,3 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage } from '@langchain/core/messages';
-import fetch from 'node-fetch'; // Ensure node-fetch is installed
-import mongoClientPromise from '../lib/mongodb.mjs';
-import dotenv from 'dotenv';
-import { parse, serialize } from 'cookie'; // Import cookie functions
-
-dotenv.config(); // Ensure environment variables are loaded
-
 export default async function generateResponseHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -36,20 +27,24 @@ export default async function generateResponseHandler(req, res) {
 
     const currentMessageContent = inputdata.message;
 
-    // Use sessionId to manage session data
+    // Connect to MongoDB and retrieve session's chat history
     const client = await mongoClientPromise;
     const dbName = "chat_history";
     const collectionName = "messages";
     const collection = client.db(dbName).collection(collectionName);
 
-    let allSessionChatHistory = await collection.findOne({ sessionId }) || { history: [] };
-    let currentChatHistory = allSessionChatHistory.history.slice(-4); // Last 4 messages
+    let sessionData = await collection.findOne({ sessionId });
 
-    // Add current message to all session chat history
-    allSessionChatHistory.history.push(new HumanMessage({ content: currentMessageContent }));
+    if (!sessionData) {
+      // Create a new session document if it doesn't exist
+      sessionData = { sessionId, history: [] };
+    }
 
-    const formattedChatHistory = currentChatHistory
-      .map((message) => `User: ${message.content}`)
+    // Push the user's message to the session's history
+    sessionData.history.push({ role: 'user', content: currentMessageContent });
+
+    const formattedChatHistory = sessionData.history
+      .map((message) => `${message.role === 'user' ? 'User' : 'Bot'}: ${message.content}`)
       .join('\n');
 
     // Call the vector search handler to get the relevant context
@@ -91,16 +86,15 @@ export default async function generateResponseHandler(req, res) {
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
     console.log('LLM result:', result);
 
-    // Ensure the LLM result has a valid 'content' field
     const responseContent = result?.content || 'No content returned from LLM';
-    
-    // Add the response to the chat history
-    allSessionChatHistory.history.push(new HumanMessage({ content: responseContent }));
 
-    // Save all session chat history to MongoDB
+    // Add the bot's response to the session's history
+    sessionData.history.push({ role: 'bot', content: responseContent });
+
+    // Save updated chat history to MongoDB
     await collection.updateOne(
       { sessionId },
-      { $set: { history: allSessionChatHistory.history } },
+      { $set: { history: sessionData.history } },
       { upsert: true }
     );
 

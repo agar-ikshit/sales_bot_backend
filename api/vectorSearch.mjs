@@ -19,10 +19,10 @@ async function createVectorStore() {
         stripNewLines: true,
       }), {
       collection,
-      indexName: "vector_index", // Ensure this matches your index name
-      textKey: "text", // Field where the text is stored
-      embeddingKey: "embedding", // Field where the vector embeddings are stored
-      similarity: "cosine" // Ensure this matches your index configuration
+      indexName: "vector_index", 
+      textKey: "text", 
+      embeddingKey: "embedding", 
+      similarity: "cosine" 
     });
 
     console.log("Vector Store created successfully");
