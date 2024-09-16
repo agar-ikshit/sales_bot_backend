@@ -78,7 +78,7 @@ export default async function generateResponseHandler(req, res) {
     const context = vectorSearchResult.text || 'No context available';
 
     const TEMPLATE = `
-    I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
+    I want you to act as a document that I am having a conversation with. Your are a helpful sales bot. Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     
     If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
@@ -88,6 +88,7 @@ export default async function generateResponseHandler(req, res) {
     ${formattedChatHistory}
     ------------
     Current Message: ${currentMessageContent}
+    Answer based on the context you recieve 
     `;
 
     const llm = new ChatOpenAI({
@@ -115,7 +116,6 @@ export default async function generateResponseHandler(req, res) {
   }
 }
 
-// Utility function to generate a unique session ID
 function generateUniqueSessionId() {
   return (Math.random() * 1e18).toString(36);
 }
