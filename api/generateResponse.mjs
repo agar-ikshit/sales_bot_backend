@@ -31,7 +31,7 @@ export default async function generateResponseHandler(req, res) {
     if (!sessionId) {
       // Generate a new session ID if none exists
       sessionId = generateUniqueSessionId();
-      res.setHeader('Set-Cookie', serialize('sessionId', sessionId, { httpOnly: true, maxAge: 30 * 60 * 1000 })); // Set cookie
+      res.setHeader('Set-Cookie', serialize('sessionId', sessionId, { httpOnly: true, maxAge: 30 * 60 * 1000, path: '/' })); // Set cookie
     }
 
     const currentMessageContent = inputdata.message;
@@ -42,17 +42,22 @@ export default async function generateResponseHandler(req, res) {
     const collectionName = "messages";
     const collection = client.db(dbName).collection(collectionName);
 
+    // Retrieve existing session data from MongoDB
     let sessionData = await collection.findOne({ sessionId });
 
     if (!sessionData) {
-      // Create a new session document if it doesn't exist
+      // If session data does not exist, create a new session object
       sessionData = { sessionId, history: [] };
     }
 
     // Push the user's message to the session's history
     sessionData.history.push({ role: 'user', content: currentMessageContent });
 
-    const formattedChatHistory = sessionData.history
+    // Keep only the last 4 messages in the history
+    const lastFourMessages = sessionData.history.slice(-4);
+
+    // Format the last 4 messages for context
+    const formattedChatHistory = lastFourMessages
       .map((message) => `${message.role === 'user' ? 'User' : 'Bot'}: ${message.content}`)
       .join('\n');
 
@@ -72,7 +77,7 @@ export default async function generateResponseHandler(req, res) {
     const vectorSearchResult = await vectorSearchResponse.json();
     const context = vectorSearchResult.text || '';
 
-    // Combine the chat history and context in the prompt
+    // Combine the context and the last 4 messages in the prompt
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
     You also need to ask for the customer's name and contact number and then store them.
@@ -100,7 +105,7 @@ export default async function generateResponseHandler(req, res) {
     // Add the bot's response to the session's history
     sessionData.history.push({ role: 'bot', content: responseContent });
 
-    // Save updated chat history to MongoDB
+    // Save the updated chat history to MongoDB
     await collection.updateOne(
       { sessionId },
       { $set: { history: sessionData.history } },
