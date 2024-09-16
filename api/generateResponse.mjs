@@ -78,9 +78,9 @@ export default async function generateResponseHandler(req, res) {
     const context = vectorSearchResult.text || 'No context available';
 
     const TEMPLATE = `
-    I want you to act as a sales man who is here to help me understand the different kinds of printers we sell at adriotec. Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
+   
+    I want you to act as a sales man from adriotec that I am having a conversation with.You have the documents about the customers questions in the context provided below Customers will ask you questions about the given context you have to answer those to the best of your capabilities.
     
-    If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
     ${context}
     ------------
