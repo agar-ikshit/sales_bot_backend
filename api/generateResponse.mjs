@@ -80,7 +80,7 @@ export default async function generateResponseHandler(req, res) {
     // Combine the context and the last 4 messages in the prompt
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
-    You also need to ask for the customer's name and contact number and then store them.
+    
     If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
     ${context}
