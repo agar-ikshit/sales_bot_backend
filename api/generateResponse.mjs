@@ -1,17 +1,23 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
-import fetch from 'node-fetch'; // Ensure node-fetch is installed
+import fetch from 'node-fetch';
 import mongoClientPromise from '../lib/mongodb.mjs';
 import dotenv from 'dotenv';
 import { parse, serialize } from 'cookie'; 
 
-dotenv.config(); // Ensure environment variables are loaded
+dotenv.config(); 
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': 'https://sales-bot-eight.vercel.app',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Credentials': 'true',
+};
+
+const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: 'Strict', maxAge: 30 * 60 * 1000, path: '/' };
 
 export default async function generateResponseHandler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://sales-bot-eight.vercel.app');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.set(CORS_HEADERS);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -24,44 +30,35 @@ export default async function generateResponseHandler(req, res) {
       return res.status(400).json({ error: 'Invalid input data' });
     }
 
-    // Retrieve session ID from cookies
     const cookies = parse(req.headers.cookie || '');
     let sessionId = cookies.sessionId;
 
     if (!sessionId) {
-      // Generate a new session ID if none exists
       sessionId = generateUniqueSessionId();
-      res.setHeader('Set-Cookie', serialize('sessionId', sessionId, { httpOnly: true, maxAge: 30 * 60 * 1000, path: '/' })); // Set cookie
+      res.setHeader('Set-Cookie', serialize('sessionId', sessionId, COOKIE_OPTIONS)); // Set cookie
     }
 
     const currentMessageContent = inputdata.message;
 
-    // Connect to MongoDB and retrieve session's chat history
     const client = await mongoClientPromise;
     const dbName = "chat_history";
     const collectionName = "messages";
     const collection = client.db(dbName).collection(collectionName);
 
-    // Retrieve existing session data from MongoDB
     let sessionData = await collection.findOne({ sessionId });
 
     if (!sessionData) {
-      // If session data does not exist, create a new session object
       sessionData = { sessionId, history: [] };
     }
 
-    // Push the user's message to the session's history
     sessionData.history.push({ role: 'user', content: currentMessageContent });
 
-    // Keep only the last 4 messages in the history
     const lastFourMessages = sessionData.history.slice(-4);
 
-    // Format the last 4 messages for context
     const formattedChatHistory = lastFourMessages
       .map((message) => `${message.role === 'user' ? 'User' : 'Bot'}: ${message.content}`)
       .join('\n');
 
-    // Call the vector search handler to get the relevant context
     const vectorSearchResponse = await fetch('https://backend-theta-eosin.vercel.app/api/vectorSearch', {
       method: 'POST',
       headers: {
@@ -75,12 +72,11 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const vectorSearchResult = await vectorSearchResponse.json();
-    const context = vectorSearchResult.text || '';
+    const context = vectorSearchResult.text || 'No context available';
 
-    // Combine the context and the last 4 messages in the prompt
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
-    Only answer based on the context you recieve dont spit out random answers
+    Only answer based on the context you receive. Don't spit out random answers.
     If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
     ${context}
@@ -96,16 +92,13 @@ export default async function generateResponseHandler(req, res) {
       streaming: false,
     });
 
-    // Retrieve response from the LLM
     const result = await llm.call([new HumanMessage({ content: TEMPLATE })]);
     console.log('LLM result:', result);
 
     const responseContent = result?.content || 'No content returned from LLM';
 
-    // Add the bot's response to the session's history
     sessionData.history.push({ role: 'bot', content: responseContent });
 
-    // Save the updated chat history to MongoDB
     await collection.updateOne(
       { sessionId },
       { $set: { history: sessionData.history } },
@@ -114,7 +107,7 @@ export default async function generateResponseHandler(req, res) {
 
     res.status(200).json({ text: responseContent });
   } catch (error) {
-    console.error('Error generating response:', error);
+    console.error('Error generating response:', error.message, error.stack);
     res.status(500).json({ error: 'Error generating response' });
   }
 }
