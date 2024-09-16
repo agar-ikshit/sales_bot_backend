@@ -80,7 +80,7 @@ export default async function generateResponseHandler(req, res) {
     const TEMPLATE = `
    
     I want you to act as a sales man from adriotec that I am having a conversation with.You have the documents about the customers questions in the context provided below Customers will ask you questions about the given context you have to answer those to the best of your capabilities.
-    
+    If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
     ${context}
     ------------
