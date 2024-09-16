@@ -76,7 +76,7 @@ export default async function generateResponseHandler(req, res) {
 
     const TEMPLATE = `
     I want you to act as a document that I am having a conversation with. Your name is "Sales Bot". Customers will ask you questions about the printers given in context, and you have to answer those to the best of your capabilities.
-    Only answer based on the context you receive. Don't spit out random answers.
+    
     If there is nothing in the context relevant to the question at hand, just say "Hmm, I'm not sure" and stop after that. Refuse to answer any question not about the info. Never break character.
     ------------
     ${context}
