@@ -75,7 +75,8 @@ export default async function generateResponseHandler(req, res) {
     }
 
     const vectorSearchResult = await vectorSearchResponse.json();
-    const context = vectorSearchResult.text || 'No context available';
+    const context = vectorSearchResult.map(doc => doc.pageContent).join(' ')|| 'No context available';
+    console.log(context);
 
     const TEMPLATE = `
    
